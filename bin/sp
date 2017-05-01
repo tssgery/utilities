@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# look for a few utilities we need
+DIALOG=`which dialog`
+SCREEN=`which screen`
+if [ -z "${DIALOG}" ]; then
+  echo "Can not find 'dialog' in the path, please install it"
+  exit 1
+fi
+if [ -z "${SCREEN}" ]; then
+  echo "Can not find 'screen' in the path, please install it"
+  exit 1
+fi
+
+# first, get a list of all the screen sessions running
+ALLSCREENS=()
+OPTIONS=()
+
+IFS=
+
+while read -e; do
+   REPLY=$(sed -e 's/^[[:space:]]*//' <<<"$REPLY")
+   ALLSCREENS+=("$REPLY")
+done < <(screen \-ls | grep -v 'No Sockets' | grep '[0-9]\{3,\}')
+
+item=0
+for a in ${ALLSCREENS[@]}
+do
+  ITEM=`echo $a | cut -f1 -d '.'`
+  ITEM=`echo $ITEM | grep -o "[0-9]\{3,\}"`
+  OPTIONS+=( "$ITEM"  "$a" )
+#  echo "$ITEM: $a"
+done
+
+OPTIONS+=( "NEW" "===> Create a new screen session" )
+
+unset IFS
+
+CMD=(dialog --clear --backtitle "screen-picker" --title "screens" --menu "pick one" 15 80 9 )
+
+choice=$( "${CMD[@]}" "${OPTIONS[@]}" 2>&1 >/dev/tty )
+retval=$?
+
+clear
+
+
+if [ $retval -ne 0 ]; then
+   exit
+fi
+
+if [ "${choice}" = "NEW" ]; then
+   # get a new session name and launch a new screen
+   CMD=(dialog --backtitle "screen-picker" --title "new" --inputbox "Session Name" 8 50 )
+
+   choice=$( "${CMD[@]}" 2>&1 >/dev/tty )
+   retval=$?
+
+   if [ $retval -eq 0 ]; then
+       clear
+       screen -S "${choice}"
+   fi
+
+else
+   # bring back the old session
+   screen -d -r "${choice}"
+fi
+
